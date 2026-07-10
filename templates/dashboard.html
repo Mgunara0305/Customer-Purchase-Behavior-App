@@ -1,95 +1,584 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="static/css/style.css">
-    <title>Customer Purchase Behavior Predictor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <title>PredictAI Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-dark">
-<div class="container">
-    <div class="row">
-        <div class="card mt-50" style="width: 100%; height: 100%">
-            <div class="card-header" style="text-align: center">
-                <h1>Welcome To Customer Purchase Behavior Predictor</h1>
-            </div>
-            <div class="card-body">
-                <div class="col-12" style="text-align: center">
-                    <h5>Try filling the details below: </h5>
-                </div>
-                <br>
-                <form method="post" accept-charset="utf-8" name="Modelform">
-                    <div class="col-md-10 form-group" style="text-align: center">
-                        <label><b>Enter Age</b> </label><br>
-                        <select class="selectpicker form-control" id="age" name="age" required="1">
-                            {% for age_value in age %}
-                            <option value="{{ age_value }}">{{ age_value }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-10 form-group" style="text-align: center">
-                        <label><b>Select Gender:</b> </label><br>
-                        <select class="selectpicker form-control" id="male" name="male" required="1">
-                            {% for key, value in gender_options.items() %}
-                            <option value="{{ key }}">{{ value }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-10 form-group" style="text-align: center">
-                        <label><b>Select Salary:</b> </label><br>
-                        <select class="selectpicker form-control" id="salary" name="salary" required="1">
-                            {% for salary_value in salary %}
-                            <option value="{{ salary_value }}">{{ salary_value }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
 
-                    <div class="col-md-10 form-group" style="text-align: center">
-                        <label><b>Enter Price:</b> </label><br>
-                        <input type="text" class="form-control" id="price" name="price" placeholder="price">
-                    </div>
-
-                    <div class="col-md-10 form-group" style="text-align: center">
-                        <button class="btn btn-primary form-control" onclick="send_data()">Predict Behaviour</button>
-                    </div>
-                </form>
-                <br>
-                <div class="row">
-                    <div class="col-12" style="text-align: center">
-                        <h4><span id="prediction"></span></h4>
-                    </div>
-                </div>
-            </div>
+<body class="app-shell">
+    <aside class="sidebar">
+        <a class="brand sidebar-brand" href="{{ url_for('home') }}">
+            <span class="brand-mark">P</span>
+            <span>PredictAI</span>
+        </a>
+        <nav class="side-nav" aria-label="Main navigation">
+            <a class="active" href="#dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+            <a href="#customers"><i data-lucide="users"></i><span>Customers</span></a>
+            <a href="#prediction"><i data-lucide="brain-circuit"></i><span>Prediction</span></a>
+            <a href="#analytics"><i data-lucide="bar-chart-3"></i><span>Analytics</span></a>
+            <a href="#reports"><i data-lucide="file-line-chart"></i><span>Reports</span></a>
+            <a href="#settings"><i data-lucide="settings"></i><span>Settings</span></a>
+            <a href="#profile"><i data-lucide="circle-user-round"></i><span>Profile</span></a>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" type="button" id="themeToggle" aria-label="Toggle dark mode">
+                <i data-lucide="moon"></i>
+                <span>Dark Mode</span>
+            </button>
+            <a class="logout-link" href="{{ url_for('logout') }}"><i data-lucide="log-out"></i><span>Logout</span></a>
         </div>
-    </div>
-</div>
-<script>
-    function form_handler(event) {
-        event.preventDefault();
-    }
+    </aside>
 
-    function send_data() {
-        document.querySelector('form').addEventListener('submit', form_handler);
-        //suppress form default behavior
+    <main class="main-content">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Customer Purchase Intelligence</p>
+                <h1>Purchase Prediction Dashboard</h1>
+            </div>
+            <div class="profile-pill">
+                <span>{{ current_user.username[:1]|upper }}</span>
+                <div>
+                    <strong>{{ current_user.username }}</strong>
+                    <small>Analyst</small>
+                </div>
+            </div>
+        </header>
 
-        // Send and Receive data to /predict
-        var fd = new FormData(document.querySelector('form'));
+        <section class="metric-grid" id="dashboard">
+            <article class="metric-card glass-card">
+                <div class="metric-icon blue"><i data-lucide="users"></i></div>
+                <span>Total Customers</span>
+                <strong class="counter" data-target="{{ stats.total_customers }}">0</strong>
+                <small>Active customer records</small>
+            </article>
+            <article class="metric-card glass-card">
+                <div class="metric-icon green"><i data-lucide="shopping-bag"></i></div>
+                <span>Predicted Buyers</span>
+                <strong class="counter" data-target="{{ stats.predicted_buyers }}">0</strong>
+                <small>High intent customers</small>
+            </article>
+            <article class="metric-card glass-card">
+                <div class="metric-icon amber"><i data-lucide="target"></i></div>
+                <span>Prediction Accuracy</span>
+                <strong><span class="counter" data-target="{{ stats.accuracy }}">0</span>%</strong>
+                <small>Measured against purchase data</small>
+            </article>
+            <article class="metric-card glass-card">
+                <div class="metric-icon red"><i data-lucide="trending-up"></i></div>
+                <span>Revenue Opportunity</span>
+                <strong>$<span class="counter" data-target="{{ stats.revenue_opportunity }}">0</span></strong>
+                <small>Likely buyer basket value</small>
+            </article>
+        </section>
 
-        var xhr = new XMLHttpRequest();
+        <section class="content-grid" id="analytics">
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Distribution</span>
+                        <h2>Purchase Distribution</h2>
+                    </div>
+                    <i data-lucide="pie-chart"></i>
+                </div>
+                <canvas id="purchaseChart"></canvas>
+            </article>
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Segments</span>
+                        <h2>Customer Age Groups</h2>
+                    </div>
+                    <i data-lucide="activity"></i>
+                </div>
+                <canvas id="ageChart"></canvas>
+            </article>
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Income</span>
+                        <h2>Income Distribution</h2>
+                    </div>
+                    <i data-lucide="wallet"></i>
+                </div>
+                <canvas id="incomeChart"></canvas>
+            </article>
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Confidence</span>
+                        <h2>Probability Histogram</h2>
+                    </div>
+                    <i data-lucide="gauge"></i>
+                </div>
+                <canvas id="probabilityChart"></canvas>
+            </article>
+        </section>
 
-        xhr.open('POST', '/predict', true);
-        document.getElementById('prediction').innerHTML = "WAIT! Predicting Behaviour...";
+        <section class="split-grid" id="prediction">
+            <article class="panel prediction-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">AI Model</span>
+                        <h2>Prediction Workspace</h2>
+                    </div>
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <form id="predictionForm" class="prediction-form">
+                    <div class="form-card">
+                        <h3><i data-lucide="user-round"></i> Personal Information</h3>
+                        <label>
+                            <span>Customer Name</span>
+                            <input type="text" name="customer_name" placeholder="New Customer">
+                        </label>
+                        <label>
+                            <span>Age</span>
+                            <select id="age" name="age" required>
+                                {% for age_value in age %}
+                                <option value="{{ age_value }}">{{ age_value }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Gender</span>
+                            <select id="male" name="male" required>
+                                {% for key, value in gender_options.items() %}
+                                <option value="{{ key }}">{{ value }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                    </div>
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == XMLHttpRequest.DONE) {
-                document.getElementById("prediction").innerHTML = xhr.responseText;
+                    <div class="form-card">
+                        <h3><i data-lucide="badge-dollar-sign"></i> Lifestyle</h3>
+                        <label>
+                            <span>Income</span>
+                            <select id="salary" name="salary" required>
+                                {% for salary_value in salary %}
+                                <option value="{{ salary_value }}">{{ salary_value }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Spending Score</span>
+                            <input type="number" min="1" max="100" name="spending_score" value="72">
+                        </label>
+                    </div>
+
+                    <div class="form-card">
+                        <h3><i data-lucide="shopping-cart"></i> Shopping</h3>
+                        <label>
+                            <span>Product Price</span>
+                            <select id="price" name="price" required>
+                                {% for price_value in price %}
+                                <option value="{{ price_value }}">{{ price_value }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Family Size</span>
+                            <input type="number" min="1" max="10" name="family_size" value="3">
+                        </label>
+                        <label>
+                            <span>Previous Purchases</span>
+                            <input type="number" min="0" max="50" name="previous_purchases" value="4">
+                        </label>
+                    </div>
+
+                    <button class="button button-primary predict-button" type="submit" id="predictButton">
+                        <i data-lucide="wand-sparkles"></i>
+                        <span>Predict</span>
+                    </button>
+                </form>
+            </article>
+
+            <article class="panel result-panel">
+                <div id="loadingState" class="loading-state hidden">
+                    <div class="scanner"></div>
+                    <strong>Analyzing Customer...</strong>
+                    <span>Running AI Model...</span>
+                    <div class="progress-line"><span></span></div>
+                </div>
+                <div id="emptyResult" class="empty-result">
+                    <i data-lucide="radar"></i>
+                    <h2>Ready for a prediction</h2>
+                    <p>Customer intelligence will appear here.</p>
+                </div>
+                <div id="predictionResult" class="prediction-result hidden">
+                    <span class="success-badge"><i data-lucide="check"></i> Prediction Complete</span>
+                    <div class="confidence-gauge" style="--value: 0">
+                        <div>
+                            <strong id="probabilityValue">0%</strong>
+                            <span>Likelihood</span>
+                        </div>
+                    </div>
+                    <h2 id="predictionLabel">Likely to Purchase</h2>
+                    <p id="personaBadge" class="persona-badge">Premium Buyer</p>
+                    <div class="why-box">
+                        <h3>Why?</h3>
+                        <ul id="explanationList"></ul>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel customer-panel" id="customers">
+            <div class="panel-header table-header">
+                <div>
+                    <span class="mini-label">Customer Records</span>
+                    <h2>Customers</h2>
+                </div>
+                <div class="table-actions">
+                    <input id="customerSearch" type="search" placeholder="Search customers">
+                    <select id="predictionFilter" aria-label="Filter by prediction">
+                        <option value="all">All Predictions</option>
+                        <option value="YES">Likely Buyers</option>
+                        <option value="NO">Unlikely Buyers</option>
+                    </select>
+                    <button class="icon-button" type="button" id="csvExport" title="Export CSV" aria-label="Export CSV">
+                        <i data-lucide="download"></i>
+                    </button>
+                    <button class="icon-button" type="button" id="pdfExport" title="Export PDF" aria-label="Export PDF">
+                        <i data-lucide="printer"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="customer-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="name">Name</th>
+                            <th data-sort="age">Age</th>
+                            <th data-sort="salary">Income</th>
+                            <th data-sort="prediction_label">Prediction</th>
+                            <th data-sort="probability">Probability</th>
+                            <th data-sort="persona">Persona</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customerRows"></tbody>
+                </table>
+            </div>
+            <div class="pagination-bar">
+                <button class="icon-button" type="button" id="prevPage" aria-label="Previous page"><i data-lucide="chevron-left"></i></button>
+                <span id="pageInfo">Page 1</span>
+                <button class="icon-button" type="button" id="nextPage" aria-label="Next page"><i data-lucide="chevron-right"></i></button>
+            </div>
+        </section>
+
+        <section class="content-grid reports-grid" id="reports">
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Trend</span>
+                        <h2>Monthly Purchases</h2>
+                    </div>
+                    <i data-lucide="line-chart"></i>
+                </div>
+                <canvas id="monthlyChart"></canvas>
+            </article>
+            <article class="panel chart-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Top Scores</span>
+                        <h2>Prediction Confidence</h2>
+                    </div>
+                    <i data-lucide="signal-high"></i>
+                </div>
+                <canvas id="confidenceChart"></canvas>
+            </article>
+            <article class="panel timeline-panel">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Timeline</span>
+                        <h2>Prediction History</h2>
+                    </div>
+                    <i data-lucide="history"></i>
+                </div>
+                <div class="timeline" id="historyTimeline">
+                    {% if history %}
+                    {% for item in history %}
+                    <div class="timeline-item">
+                        <span></span>
+                        <div>
+                            <strong>{{ item.customer_name }}</strong>
+                            <p>{{ item.probability|round|int }}% - {{ item.prediction }}</p>
+                            <small>{{ item.created_at.strftime('%b %d, %Y') }} - {{ item.persona }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="timeline-item">
+                        <span></span>
+                        <div>
+                            <strong>No predictions yet</strong>
+                            <p>Your saved predictions will appear here.</p>
+                            <small>Today</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </article>
+        </section>
+
+        <section class="split-grid utility-grid">
+            <article class="panel" id="settings">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Preferences</span>
+                        <h2>Settings</h2>
+                    </div>
+                    <i data-lucide="sliders-horizontal"></i>
+                </div>
+                <div class="settings-list">
+                    <label><span>Realtime Animations</span><input type="checkbox" checked></label>
+                    <label><span>Prediction History</span><input type="checkbox" checked></label>
+                    <label><span>Confidence Alerts</span><input type="checkbox" checked></label>
+                </div>
+            </article>
+            <article class="panel" id="profile">
+                <div class="panel-header">
+                    <div>
+                        <span class="mini-label">Workspace</span>
+                        <h2>Profile</h2>
+                    </div>
+                    <i data-lucide="circle-user"></i>
+                </div>
+                <div class="profile-card">
+                    <span>{{ current_user.username[:1]|upper }}</span>
+                    <div>
+                        <strong>{{ current_user.username }}</strong>
+                        <p>Customer intelligence analyst</p>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <div class="toast hidden" id="successToast"><i data-lucide="check-circle"></i> Prediction Successful</div>
+
+    <script>
+        const chartData = {{ chart_data|tojson }};
+        const customers = {{ customers|tojson }};
+    </script>
+    <script>
+        const colors = {
+            blue: '#2563EB',
+            green: '#22C55E',
+            amber: '#F59E0B',
+            red: '#EF4444',
+            ink: '#0F172A',
+            muted: '#94A3B8'
+        };
+
+        lucide.createIcons();
+
+        document.querySelectorAll('.counter').forEach((counter) => {
+            const target = Number(counter.dataset.target || 0);
+            const duration = 1100;
+            const start = performance.now();
+            const tick = (now) => {
+                const progress = Math.min((now - start) / duration, 1);
+                const value = Math.floor(target * (1 - Math.pow(1 - progress, 3)));
+                counter.textContent = value.toLocaleString();
+                if (progress < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { usePointStyle: true, color: '#64748B' } }
+            },
+            scales: {
+                x: { ticks: { color: '#64748B' }, grid: { display: false } },
+                y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(148, 163, 184, 0.18)' } }
             }
         };
 
-        xhr.send(fd);
-    }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+        new Chart(document.getElementById('purchaseChart'), {
+            type: 'doughnut',
+            data: {
+                labels: chartData.purchase_distribution.labels,
+                datasets: [{ data: chartData.purchase_distribution.values, backgroundColor: [colors.green, colors.red], borderWidth: 0 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: chartDefaults.plugins, cutout: '68%' }
+        });
+
+        new Chart(document.getElementById('ageChart'), {
+            type: 'bar',
+            data: { labels: chartData.age_groups.labels, datasets: [{ label: 'Customers', data: chartData.age_groups.values, backgroundColor: colors.blue, borderRadius: 8 }] },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('incomeChart'), {
+            type: 'bar',
+            data: { labels: chartData.income_distribution.labels, datasets: [{ label: 'Customers', data: chartData.income_distribution.values, backgroundColor: colors.amber, borderRadius: 8 }] },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('probabilityChart'), {
+            type: 'bar',
+            data: { labels: chartData.probability_histogram.labels, datasets: [{ label: 'Customers', data: chartData.probability_histogram.values, backgroundColor: colors.green, borderRadius: 8 }] },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('monthlyChart'), {
+            type: 'line',
+            data: {
+                labels: chartData.monthly_purchases.labels,
+                datasets: [{ label: 'Purchases', data: chartData.monthly_purchases.values, borderColor: colors.blue, backgroundColor: 'rgba(37, 99, 235, 0.14)', fill: true, tension: 0.42 }]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('confidenceChart'), {
+            type: 'bar',
+            data: { labels: chartData.confidence.labels, datasets: [{ label: 'Probability', data: chartData.confidence.values, backgroundColor: colors.red, borderRadius: 8 }] },
+            options: chartDefaults
+        });
+
+        const form = document.getElementById('predictionForm');
+        const loadingState = document.getElementById('loadingState');
+        const emptyResult = document.getElementById('emptyResult');
+        const predictionResult = document.getElementById('predictionResult');
+        const predictButton = document.getElementById('predictButton');
+        const toast = document.getElementById('successToast');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            loadingState.classList.remove('hidden');
+            emptyResult.classList.add('hidden');
+            predictionResult.classList.add('hidden');
+            predictButton.classList.add('is-loading');
+            predictButton.querySelector('span').textContent = 'Predicting...';
+
+            const response = await fetch('/predict', { method: 'POST', body: new FormData(form) });
+            const result = await response.json();
+
+            setTimeout(() => {
+                loadingState.classList.add('hidden');
+                predictButton.classList.remove('is-loading');
+                predictButton.querySelector('span').textContent = 'Predict';
+
+                if (result.error) {
+                    emptyResult.classList.remove('hidden');
+                    emptyResult.querySelector('p').textContent = result.error;
+                    return;
+                }
+
+                document.getElementById('probabilityValue').textContent = `${result.probability}%`;
+                document.querySelector('.confidence-gauge').style.setProperty('--value', result.probability);
+                document.getElementById('predictionLabel').textContent = result.prediction;
+                document.getElementById('personaBadge').textContent = result.persona;
+                document.getElementById('explanationList').innerHTML = result.explanations.map((item) => `<li>${item}</li>`).join('');
+                predictionResult.classList.remove('hidden');
+
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 2400);
+                prependHistory(result);
+            }, 900);
+        });
+
+        function prependHistory(result) {
+            const timeline = document.getElementById('historyTimeline');
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.innerHTML = `<span></span><div><strong>${result.customer_name}</strong><p>${result.probability}% - ${result.prediction}</p><small>Today - ${result.persona}</small></div>`;
+            timeline.prepend(item);
+        }
+
+        let page = 1;
+        let sortKey = 'name';
+        let sortDirection = 1;
+        const pageSize = 8;
+        const rows = document.getElementById('customerRows');
+        const search = document.getElementById('customerSearch');
+        const filter = document.getElementById('predictionFilter');
+
+        function filteredCustomers() {
+            const term = search.value.toLowerCase();
+            return customers
+                .filter((customer) => filter.value === 'all' || customer.prediction_label === filter.value)
+                .filter((customer) => `${customer.name} ${customer.persona} ${customer.prediction_label}`.toLowerCase().includes(term))
+                .sort((a, b) => {
+                    if (a[sortKey] > b[sortKey]) return sortDirection;
+                    if (a[sortKey] < b[sortKey]) return -sortDirection;
+                    return 0;
+                });
+        }
+
+        function renderTable() {
+            const data = filteredCustomers();
+            const pages = Math.max(Math.ceil(data.length / pageSize), 1);
+            page = Math.min(page, pages);
+            const start = (page - 1) * pageSize;
+            rows.innerHTML = data.slice(start, start + pageSize).map((customer) => `
+                <tr>
+                    <td>${customer.name}</td>
+                    <td>${customer.age}</td>
+                    <td>$${Number(customer.salary).toLocaleString()}</td>
+                    <td><span class="status ${customer.prediction_label === 'YES' ? 'yes' : 'no'}">${customer.prediction_label}</span></td>
+                    <td>
+                        <div class="table-meter"><span style="width: ${customer.probability}%"></span></div>
+                        ${customer.probability}%
+                    </td>
+                    <td><span class="persona-tag">${customer.persona}</span></td>
+                </tr>
+            `).join('');
+            document.getElementById('pageInfo').textContent = `Page ${page} of ${pages}`;
+        }
+
+        document.querySelectorAll('[data-sort]').forEach((header) => {
+            header.addEventListener('click', () => {
+                const nextKey = header.dataset.sort;
+                sortDirection = sortKey === nextKey ? sortDirection * -1 : 1;
+                sortKey = nextKey;
+                renderTable();
+            });
+        });
+        search.addEventListener('input', () => { page = 1; renderTable(); });
+        filter.addEventListener('change', () => { page = 1; renderTable(); });
+        document.getElementById('prevPage').addEventListener('click', () => { page = Math.max(page - 1, 1); renderTable(); });
+        document.getElementById('nextPage').addEventListener('click', () => { page += 1; renderTable(); });
+
+        document.getElementById('csvExport').addEventListener('click', () => {
+            const data = filteredCustomers();
+            const lines = ['Name,Age,Income,Prediction,Probability,Persona', ...data.map((customer) =>
+                [customer.name, customer.age, customer.salary, customer.prediction_label, `${customer.probability}%`, customer.persona].join(',')
+            )];
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'predictai-customers.csv';
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('pdfExport').addEventListener('click', () => {
+            const printWindow = window.open('', '_blank');
+            const tableRows = filteredCustomers().map((customer) =>
+                `<tr><td>${customer.name}</td><td>${customer.age}</td><td>$${Number(customer.salary).toLocaleString()}</td><td>${customer.prediction_label}</td><td>${customer.probability}%</td><td>${customer.persona}</td></tr>`
+            ).join('');
+            printWindow.document.write(`<html><head><title>PredictAI Customers</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;text-align:left}</style></head><body><h1>PredictAI Customer Report</h1><table><thead><tr><th>Name</th><th>Age</th><th>Income</th><th>Prediction</th><th>Probability</th><th>Persona</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+            printWindow.document.close();
+            printWindow.print();
+        });
+
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('predictai-theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        });
+        if (localStorage.getItem('predictai-theme') === 'dark') document.body.classList.add('dark-mode');
+
+        renderTable();
+    </script>
 </body>
+
 </html>
